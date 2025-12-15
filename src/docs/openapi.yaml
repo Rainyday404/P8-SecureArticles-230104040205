@@ -1,0 +1,208 @@
+openapi: 3.0.0
+info:
+  title: WSE P8 Secure Articles API
+  description: API untuk manajemen artikel dengan autentikasi JWT dan RBAC.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local Development Server
+
+# Definisi Keamanan (Bearer Token)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Article:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [draft, published]
+    UserRegister:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+    UserLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  # --- SYSTEM ---
+  /health:
+    get:
+      summary: Health check
+      security: [] # Public endpoint
+      responses:
+        '200':
+          description: Service is healthy
+
+  # --- AUTHENTICATION ---
+  /api/auth/register:
+    post:
+      summary: Mendaftar user baru
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201':
+          description: User created
+
+  /api/auth/login:
+    post:
+      summary: Login untuk mendapatkan Token
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login successful (Returns Access & Refresh Token)
+
+  /api/auth/me:
+    get:
+      summary: Cek profil user yang sedang login (Who am I)
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile data
+
+  /api/auth/refresh:
+    post:
+      summary: Perbarui Access Token menggunakan Refresh Token
+      tags: [Auth]
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New Access Token
+
+  /api/auth/logout:
+    post:
+      summary: Logout (Hapus refresh token di server)
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+
+  # --- ARTICLES ---
+  /api/articles:
+    get:
+      summary: Ambil semua artikel (Bisa Search & Filter)
+      tags: [Articles]
+      security: [] # Public read
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Keyword pencarian
+      responses:
+        '200':
+          description: List of articles
+
+    post:
+      summary: Buat Artikel Baru (Login Required)
+      tags: [Articles]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Article'
+      responses:
+        '201':
+          description: Article created
+
+  /api/articles/{id}:
+    put:
+      summary: Edit Artikel (Hanya Owner/Admin)
+      tags: [Articles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Article'
+      responses:
+        '200':
+          description: Article updated
+
+    delete:
+      summary: Hapus Artikel (Hanya Admin)
+      tags: [Articles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Article deleted
